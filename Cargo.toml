@@ -8,12 +8,12 @@ repository = "https://github.com/s-panferov/lseq"
 authors = ["Stanislav Panferov <fnight.m@gmail.com>"]
 
 [dependencies]
-uuid = { version = "*", features = ["serde", "v4"]}
-rand = "*"
-num = "*"
-skiplist = "*"
+uuid = { version = "^0.6.2", features = ["serde", "v4"] }
+rand = "^0.4.2"
+num = "^0.1.42"
+skiplist = "^0.2.10"
 
 [dependencies.rug]
-version = "*"
+version = "^1.0.1"
 default-features = false
 features = ["integer", "rand"]

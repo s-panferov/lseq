@@ -38,7 +38,7 @@ version = "0.1.0"
 dependencies = [
  "num 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "rug 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rug 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "skiplist 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -131,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "rug"
-version = "0.10.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "gmp-mpfr-sys 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -200,7 +200,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum num-traits 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "dee092fcdf725aee04dd7da1d21debff559237d49ef1cb3e69bcb8ece44c7364"
 "checksum rand 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)" = "15a732abf9d20f0ad8eeb6f909bf6868722d9a06e1e50802b6a70351f40b4eb1"
 "checksum rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "eba5f8cb59cc50ed56be8880a5c7b496bfd9bd26394e176bc67884094145c2c5"
-"checksum rug 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6a9c9e41219fcc0bff74c35dd2b7eade8a54aaa385ed63109949c241c94a3c88"
+"checksum rug 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "849cbf8b169fc5d38dc880268fdf9b2abdf07b8b5c55778b2030a37965de08d6"
 "checksum rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)" = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
 "checksum serde 1.0.36 (registry+https://github.com/rust-lang/crates.io-index)" = "c70142ae874a42c70e03c63c6a49abe2ea0079b090bf6e136e99252fc1974bd6"
 "checksum skiplist 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)" = "b7737ee2f6e789525feac28c4c3e3bb9216feb409bc4b90ce29970de6448eb94"
