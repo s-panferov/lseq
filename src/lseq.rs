@@ -1,111 +1,15 @@
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use rug::rand::RandState;
-use std::fmt;
-
 use rug::Integer;
 
-pub use super::base::{BitBase, DoubleBase};
+use super::base::{BitBase, DoubleBase};
 use super::strategy::LSEQStrategy;
+use super::ident::{Ident};
+use super::meta::{Meta};
 
-pub trait Replica: Ord + Clone + Eq + fmt::Debug {}
-impl<R> Replica for R
-where
-  R: Ord + Clone + Eq + fmt::Debug,
-{
-}
-
-#[derive(Clone, PartialEq, Eq)]
-pub struct Ident<R: Replica> {
-  replica: R,
-  digit: Integer,
-}
-
-impl<R: Replica> fmt::Debug for Ident<R> {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    let mut digit = self.digit.clone();
-    digit.set_bit(self.digit.significant_bits() - 1, false);
-    write!(f, "Ident {:?} {}", self.replica, digit)
-  }
-}
-
-impl<R: Replica> Ident<R> {
-  pub fn new(replica: R, mut digit: Integer, size: u32) -> Ident<R> {
-    digit.set_bit(size, true);
-    Ident { replica, digit }
-  }
-
-  pub fn debug_base(&self, base: &BitBase) -> String {
-    let digit = self.digit.clone();
-    let size = self.digit.significant_bits() - 1;
-    let mut depth = 0;
-    while size != base.get_bits(depth) {
-      depth += 1;
-    }
-
-    println!("digit {} {} {}", digit, digit.to_string_radix(2), size);
-
-    let mut components = vec![];
-    let mut string = digit.to_string_radix(2)[1..].to_string();
-    let mut skip = 1;
-    for i in 0..(depth + 1) {
-      let size = base.get_bits(i) - skip;
-      let clone = string.clone();
-      let (front, rest) = clone.split_at(size as usize + 1);
-      string = rest.to_string();
-      skip += size + 1;
-      components.push(Integer::from(Integer::parse_radix(front, 2).unwrap()))
-    }
-
-    format!(
-      "Ident {:?} {:?} {:?}",
-      self.replica,
-      self.digit.to_string_radix(2),
-      components
-    )
-  }
-}
-
-impl<R: Replica> PartialOrd for Ident<R> {
-  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-    Some(self.cmp(other))
-  }
-}
-
-impl<R: Replica> Ord for Ident<R> {
-  fn cmp(&self, other: &Ident<R>) -> Ordering {
-    let self_length = self.digit.significant_bits();
-    let other_length = other.digit.significant_bits();
-
-    let self_norm: Integer;
-    let other_norm: Integer;
-
-    if self_length > other_length {
-      // mine > other (in size)
-      other_norm = other.digit.clone() << (self_length - other_length);
-      self_norm = self.digit.clone();
-    } else {
-      other_norm = other.digit.clone();
-      self_norm = self.digit.clone() << (other_length - self_length);
-    }
-
-    let cmp_n = self_norm.cmp(&other_norm);
-    if cmp_n != Ordering::Equal {
-      return cmp_n;
-    }
-
-    let cmp_replica = self.replica.cmp(&other.replica);
-    if cmp_replica != Ordering::Equal {
-      return cmp_replica;
-    }
-
-    return self_length.cmp(&other_length);
-  }
-}
-
-pub trait IdentGenerator<R: Replica> {
-  fn generate(&mut self, replica: R, left: Option<&Ident<R>>, right: Option<&Ident<R>>)
-    -> Ident<R>;
+pub trait IdentGenerator<M: Meta> {
+  fn generate(&mut self, replica: M, left: Option<&Ident<M>>, right: Option<&Ident<M>>)
+    -> Ident<M>;
 }
 
 pub struct LSEQGenerator<B: BitBase = DoubleBase> {
@@ -134,26 +38,30 @@ impl<B: BitBase> LSEQGenerator<B> {
       self.strategies.insert(depth as usize, random.clone());
     }
   }
-}
 
-impl<B: BitBase, R: Replica> IdentGenerator<R> for LSEQGenerator<B> {
-  fn generate(
-    &mut self,
-    replica: R,
-    left: Option<&Ident<R>>,
-    right: Option<&Ident<R>>,
-  ) -> Ident<R> {
+  fn pick_interval<M: Meta>(&self, left: Option<&Ident<M>>, right: Option<&Ident<M>>) -> (Integer, u32, Integer, Integer) {
     let mut interval = Integer::from(0);
     let mut depth: u32 = 0;
 
-    let first = Ident::new(replica.clone(), Integer::from(0), self.base.get_bits(0));
-    let last = Ident::new(replica.clone(), self.base.get_max(0), self.base.get_bits(0));
+    let left_v = left.map(|i| i.digit.clone()).unwrap_or_else(|| {
+      let mut int = Integer::from(0);
+      int.set_bit(self.base.get_bits(depth), true);
+      int
+    });
 
-    let left_v = left.unwrap_or(&first);
-    let right_v = right.unwrap_or(&last);
+    let right_v = right.map(|i| i.digit.clone()).unwrap_or_else(|| {
+      let mut int = self.base.get_max(0);
+      int.set_bit(self.base.get_bits(depth), true);
+      int
+    });
+
+    // {
+    //   println!("Left: {:?} [{}]", self.base.split(&left_v), left_v.to_string_radix(2));
+    //   println!("Right: {:?} [{}]", self.base.split(&right_v), right_v.to_string_radix(2));
+    // }
 
     while interval < 1 {
-      interval = self.base.interval(&left_v.digit, &right_v.digit, depth);
+      interval = self.base.interval(&left_v, &right_v, depth);
       depth += 1;
     }
 
@@ -164,42 +72,40 @@ impl<B: BitBase, R: Replica> IdentGenerator<R> for LSEQGenerator<B> {
       .min(Integer::from(self.boundary))
       .max(Integer::from(1));
 
+    let mut rand = RandState::new();
+    let delta = step.clone().random_below(&mut rand) + 1;
+
+    (delta, depth, left_v, right_v)
+  }
+}
+
+impl<B: BitBase, M: Meta> IdentGenerator<M> for LSEQGenerator<B> {
+  fn generate(
+    &mut self,
+    replica: M,
+    left: Option<&Ident<M>>,
+    right: Option<&Ident<M>>,
+  ) -> Ident<M> {
+    let (delta, depth, left_v, right_v) = self.pick_interval(left, right);
+
     self.ensure_strategy(depth);
     let strategy = self.get_strategy(depth);
-    let base_len = self.base.get_bits(depth);
 
-    match strategy {
+    let res = match strategy {
       LSEQStrategy::AddFromLeft => {
-        // #1 Truncate tail or add bits
-        let prev_bit_count = left_v.digit.significant_bits() - 1;
-
-        let left_n = if prev_bit_count >= base_len {
-          left_v.digit.clone() >> (prev_bit_count - base_len)
-        } else {
-          left_v.digit.clone() << (base_len - prev_bit_count)
-        };
-
-        let mut rand = RandState::new();
-        let plus = step.clone().random_below(&mut rand) + 1;
-
-        Ident::new(replica.clone(), left_n + plus, self.base.get_bits(depth))
+        let left_n = self.base.normalize(left_v, depth);
+        Ident::new(replica.clone(), left_n + delta)
       }
       LSEQStrategy::SubtractFromRight => {
-        // #1 Truncate tail or add bits
-        let prev_bit_count = right_v.digit.significant_bits() - 1;
-
-        let right_n = if prev_bit_count >= base_len {
-          right_v.digit.clone() >> (prev_bit_count - base_len)
-        } else {
-          right_v.digit.clone() << (base_len - prev_bit_count)
-        };
-
-        let mut rand = RandState::new();
-        let minus = step.clone().random_below(&mut rand) + 1;
-
-        Ident::new(replica.clone(), right_n - minus, self.base.get_bits(depth))
+        let right_n = self.base.normalize(right_v, depth);
+        Ident::new(replica.clone(), right_n - delta)
       }
-    }
+    };
+
+    // println!("Result {}", res.debug(&self.base));
+    // println!("---");
+
+    res
   }
 }
 
@@ -207,8 +113,10 @@ impl<B: BitBase, R: Replica> IdentGenerator<R> for LSEQGenerator<B> {
 mod tests {
   use uuid::Uuid;
   use skiplist::OrderedSkipList;
-  use super::{DoubleBase, Ident, IdentGenerator, LSEQGenerator};
   use rand::{thread_rng, Rng};
+  use average::{Max, Min, Mean};
+
+  use super::{DoubleBase, Ident, IdentGenerator, LSEQGenerator};
 
   #[test]
   fn it_works() {
@@ -219,7 +127,7 @@ mod tests {
     let mut list = OrderedSkipList::<Ident<Uuid>>::new();
     let mut rng = thread_rng();
 
-    for _i in 0..100 {
+    for _i in 0..1000 {
       let len = list.len();
       let n = if len > 0 { rng.gen_range(0, len) } else { 0 };
 
@@ -231,5 +139,14 @@ mod tests {
 
       list.insert(ident);
     }
+
+    let max: Max = list.iter().map(|i| i.digit.significant_bits().into()).collect();
+    let min: Min = list.iter().map(|i| i.digit.significant_bits().into()).collect();
+    let mean: Mean = list.iter().map(|i| i.digit.significant_bits().into()).collect();
+
+    println!("Max: {}, Min: {}, Mean: {}", max.max(), min.min(), mean.mean());
+
+    // list.iter().for_each(|i| println!("{:?}", i.debug(&gen.base)));
   }
+  
 }
